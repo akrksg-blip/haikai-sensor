@@ -393,8 +393,7 @@
 
 <p class="footer">HAIKAI SENSOR v3.0</p>
 
-<!-- EmailJS -->
-<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+<!-- EmailJS: fetch API方式 -->
 
 <script>
 // ---- EmailJS設定 ----
@@ -402,7 +401,6 @@ const EMAILJS_PUBLIC_KEY  = 'rEwsrXCFIQCNQJyn0';
 const EMAILJS_SERVICE_ID  = 'service_8kvaarq';
 const EMAILJS_TEMPLATE_ID = 'lskd60q';
 
-emailjs.init(EMAILJS_PUBLIC_KEY);
 
 // ---- 要素取得 ----
 const video      = document.getElementById('video');
@@ -568,19 +566,32 @@ function sendEmailNotification(time) {
 
   showMsg('メール送信中...', 'info');
 
-  emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
-    to_email:     toEmail,
-    time:         timeStr,
-    detect_count: detectCount,
-    name:         '俳諧感知器',
-    email:        toEmail,
-    message:      timeStr + ' に動きを検知しました。検知回数：' + detectCount + ' 回'
+  fetch('https://api.emailjs.com/api/v1.0/email/send', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      service_id:  EMAILJS_SERVICE_ID,
+      template_id: EMAILJS_TEMPLATE_ID,
+      user_id:     EMAILJS_PUBLIC_KEY,
+      template_params: {
+        to_email:     toEmail,
+        time:         timeStr,
+        detect_count: String(detectCount),
+        name:         '俳諧感知器',
+        email:        toEmail,
+        message:      timeStr + ' に動きを検知しました。検知回数：' + detectCount + ' 回'
+      }
+    })
   })
-  .then(() => {
-    showMsg('✓ メール送信完了（' + timeStr + '）', 'ok');
+  .then(res => {
+    if (res.ok) {
+      showMsg('✓ メール送信完了（' + timeStr + '）', 'ok');
+    } else {
+      return res.text().then(t => { throw new Error(t); });
+    }
   })
-  .catch((err) => {
-    showMsg('メール送信失敗: ' + JSON.stringify(err), 'error');
+  .catch(err => {
+    showMsg('メール送信失敗: ' + err.message, 'error');
   });
 }
 
