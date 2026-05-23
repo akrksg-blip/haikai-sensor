@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>俳諧感知器</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #0a0a0a;
+    color: #e8e8e8;
+    font-family: 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 16px 16px 40px;
+  }
+
+  h1 {
+    font-size: 20px;
+    font-weight: 600;
+    letter-spacing: 0.2em;
+    color: #fff;
+    margin: 12px 0 4px;
+  }
+
+  .subtitle {
+    font-size: 11px;
+    color: #555;
+    letter-spacing: 0.1em;
+    margin-bottom: 16px;
+  }
+
+  .camera-wrap {
+    position: relative;
+    width: 100%;
+    max-width: 480px;
+    background: #111;
+    border-radius: 12px;
+    overflow: hidden;
+    aspect-ratio: 4/3;
+    border: 1px solid #222;
+  }
+
+  #video {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  #diffCanvas { display: none; }
+
+  #flash {
+    position: absolute; top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: white; opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.08s;
+  }
+
+  .badge {
+    position: absolute;
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-weight: 500;
+    letter-spacing: 0.05em;
+  }
+
+  #statusBadge {
+    top: 10px; left: 10px;
+    background: rgba(0,0,0,0.7);
+    color: #aaa;
+    border: 1px solid #333;
+  }
+
+  #motionBadge {
+    top: 10px; right: 10px;
+    background: rgba(220,50,50,0.9);
+    color: #fff;
+    display: none;
+  }
+
+  .motion-bar-wrap {
+    width: 100%;
+    max-width: 480px;
+    margin-top: 10px;
+    background: #111;
+    border: 1px solid #222;
+    border-radius: 10px;
+    padding: 10px 14px;
+  }
+
+  .motion-bar-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 6px;
+  }
+
+  .motion-bar-header span { font-size: 11px; color: #555; }
+  #motionPct { font-size: 11px; color: #888; font-weight: 600; }
+
+  .bar-bg {
+    width: 100%; height: 6px;
+    background: #1e1e1e;
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  #motionBar {
+    height: 100%; width: 0%;
+    background: #2a6;
+    border-radius: 3px;
+    transition: width 0.1s, background 0.1s;
+  }
+
+  .controls {
+    width: 100%;
+    max-width: 480px;
+    margin-top: 10px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  button {
+    padding: 12px;
+    font-size: 14px;
+    font-family: inherit;
+    border-radius: 8px;
+    border: 1px solid #333;
+    background: #1a1a1a;
+    color: #e8e8e8;
+    cursor: pointer;
+    font-weight: 500;
+    letter-spacing: 0.05em;
+    transition: background 0.15s, opacity 0.15s;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  button:active { background: #2a2a2a; }
+  button:disabled { opacity: 0.3; cursor: default; }
+  #btnStart { border-color: #2a6; color: #4d4; }
+  #btnStop  { border-color: #a33; color: #f77; }
+
+  .slider-wrap {
+    width: 100%;
+    max-width: 480px;
+    margin-top: 10px;
+    background: #111;
+    border: 1px solid #222;
+    border-radius: 10px;
+    padding: 12px 14px;
+  }
+
+  .slider-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+
+  .slider-label { font-size: 12px; color: #888; }
+  #sensVal { font-size: 13px; font-weight: 600; color: #ccc; }
+
+  input[type=range] { width: 100%; accent-color: #4d4; }
+
+  .slider-hints {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 4px;
+  }
+  .slider-hints span { font-size: 10px; color: #555; }
+
+  /* メール設定パネル */
+  .email-wrap {
+    width: 100%;
+    max-width: 480px;
+    margin-top: 10px;
+    background: #111;
+    border: 1px solid #1a3a5a;
+    border-radius: 10px;
+    padding: 12px 14px;
+  }
+
+  .email-wrap h3 {
+    font-size: 12px;
+    color: #5af;
+    margin-bottom: 10px;
+    letter-spacing: 0.05em;
+  }
+
+  .email-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .email-row label {
+    font-size: 11px;
+    color: #666;
+    width: 80px;
+    flex-shrink: 0;
+  }
+
+  .email-row input {
+    flex: 1;
+    background: #0a0a0a;
+    border: 1px solid #333;
+    border-radius: 6px;
+    color: #e8e8e8;
+    font-size: 12px;
+    padding: 6px 10px;
+    font-family: inherit;
+  }
+
+  .email-row input:focus {
+    outline: none;
+    border-color: #5af;
+  }
+
+  .email-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 4px;
+  }
+
+  .email-toggle label { font-size: 12px; color: #888; }
+
+  input[type=checkbox] { accent-color: #4d4; width: 16px; height: 16px; }
+
+  .stats {
+    width: 100%;
+    max-width: 480px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  .stat-card {
+    background: #111;
+    border: 1px solid #222;
+    border-radius: 10px;
+    padding: 10px;
+    text-align: center;
+  }
+
+  .stat-num { font-size: 24px; font-weight: 600; color: #fff; line-height: 1.2; }
+  .stat-lbl { font-size: 10px; color: #555; margin-top: 2px; }
+
+  #photoLog {
+    width: 100%;
+    max-width: 480px;
+    margin-top: 12px;
+    display: none;
+  }
+
+  .log-title { font-size: 11px; color: #555; margin-bottom: 8px; letter-spacing: 0.05em; }
+
+  #photoGrid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+  }
+
+  .photo-item {
+    position: relative;
+    border-radius: 6px;
+    overflow: hidden;
+    aspect-ratio: 4/3;
+    border: 1px solid #222;
+  }
+
+  .photo-item img { width: 100%; height: 100%; object-fit: cover; }
+
+  .photo-time {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    background: rgba(0,0,0,0.7);
+    color: #ccc;
+    font-size: 9px;
+    padding: 2px 4px;
+    text-align: center;
+  }
+
+  .photo-dl {
+    position: absolute;
+    top: 3px; right: 3px;
+    background: rgba(0,0,0,0.7);
+    color: #aaa;
+    font-size: 9px;
+    padding: 2px 5px;
+    border-radius: 4px;
+    text-decoration: none;
+    border: 1px solid #444;
+  }
+
+  #msgBox {
+    width: 100%;
+    max-width: 480px;
+    margin-top: 10px;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 12px;
+    line-height: 1.6;
+  }
+
+  .msg-info  { background: #0d1f2d; color: #5af; border: 1px solid #1a3a5a; }
+  .msg-error { background: #2d0d0d; color: #f77; border: 1px solid #5a1a1a; }
+  .msg-ok    { background: #0d2d0d; color: #4d4; border: 1px solid #1a5a1a; }
+
+  .footer { margin-top: 24px; font-size: 10px; color: #2a2a2a; letter-spacing: 0.1em; }
+</style>
+</head>
+<body>
+
+<h1>俳諧感知器</h1>
+<p class="subtitle">動きを検知して自動撮影・メール通知</p>
+
+<div class="camera-wrap">
+  <video id="video" autoplay playsinline muted></video>
+  <canvas id="diffCanvas"></canvas>
+  <div id="flash"></div>
+  <span class="badge" id="statusBadge">待機中</span>
+  <span class="badge" id="motionBadge">動き検知！</span>
+</div>
+
+<div class="motion-bar-wrap">
+  <div class="motion-bar-header">
+    <span>動き量</span>
+    <span id="motionPct">0.0%</span>
+  </div>
+  <div class="bar-bg"><div id="motionBar"></div></div>
+</div>
+
+<div class="controls">
+  <button id="btnStart" onclick="startCamera()">カメラ起動</button>
+  <button id="btnStop"  onclick="stopCamera()" disabled>停止</button>
+</div>
+
+<div class="slider-wrap">
+  <div class="slider-header">
+    <span class="slider-label">検知感度（しきい値）</span>
+    <span id="sensVal">3%</span>
+  </div>
+  <input type="range" id="sensitivity" min="1" max="20" value="3" step="1"
+    oninput="document.getElementById('sensVal').textContent=this.value+'%'">
+  <div class="slider-hints">
+    <span>低（誤検知多め）</span>
+    <span>高（見逃し多め）</span>
+  </div>
+</div>
+
+<!-- メール通知設定 -->
+<div class="email-wrap">
+  <h3>📧 メール通知設定</h3>
+  <div class="email-row">
+    <label>送信先メール</label>
+    <input type="email" id="toEmail" placeholder="通知を受け取るメールアドレス">
+  </div>
+  <div class="email-toggle">
+    <input type="checkbox" id="emailEnabled" checked>
+    <label for="emailEnabled">検知時にメール通知を送る</label>
+  </div>
+</div>
+
+<div class="stats">
+  <div class="stat-card">
+    <div class="stat-num" id="statDetect">0</div>
+    <div class="stat-lbl">検知回数</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-num" id="statPhoto">0</div>
+    <div class="stat-lbl">撮影枚数</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-num" id="statTime">--</div>
+    <div class="stat-lbl">最終検知</div>
+  </div>
+</div>
+
+<div id="photoLog">
+  <p class="log-title">撮影ログ（最新9枚）</p>
+  <div id="photoGrid"></div>
+</div>
+
+<div id="msgBox" class="msg-info">「カメラ起動」を押してください</div>
+
+<p class="footer">HAIKAI SENSOR v3.0</p>
+
+<!-- EmailJS -->
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+
+<script>
+// ---- EmailJS設定 ----
+const EMAILJS_PUBLIC_KEY  = 'rEwsrXCFIQCNQJyn0';
+const EMAILJS_SERVICE_ID  = 'service_8kvaarq';
+const EMAILJS_TEMPLATE_ID = 'lskd60q';
+
+emailjs.init(EMAILJS_PUBLIC_KEY);
+
+// ---- 要素取得 ----
+const video      = document.getElementById('video');
+const diffCanvas = document.getElementById('diffCanvas');
+const diffCtx    = diffCanvas.getContext('2d', { willReadFrequently: true });
+
+let stream      = null;
+let detecting   = false;
+let cooldown    = false;
+let animFrame   = null;
+let prevData    = null;
+let detectCount = 0;
+let photoCount  = 0;
+
+function showMsg(text, type) {
+  const b = document.getElementById('msgBox');
+  b.textContent = text;
+  b.className = 'msg-' + type;
+}
+
+async function startCamera() {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 960 } },
+      audio: false
+    });
+    video.srcObject = stream;
+    await video.play();
+    document.getElementById('btnStart').disabled = true;
+    document.getElementById('btnStop').disabled  = false;
+    document.getElementById('statusBadge').textContent = '監視中';
+    showMsg('カメラ起動しました。動きを検知すると自動撮影＆メール通知します', 'ok');
+    detecting = true;
+    prevData  = null;
+    detectLoop();
+  } catch(e) {
+    if (e.name === 'NotAllowedError') {
+      showMsg('カメラの使用を許可してください。', 'error');
+    } else {
+      showMsg('カメラ起動失敗: ' + e.message, 'error');
+    }
+  }
+}
+
+function stopCamera() {
+  detecting = false;
+  if (animFrame) cancelAnimationFrame(animFrame);
+  if (stream) stream.getTracks().forEach(t => t.stop());
+  stream = null; prevData = null;
+  video.srcObject = null;
+  document.getElementById('btnStart').disabled = false;
+  document.getElementById('btnStop').disabled  = true;
+  document.getElementById('statusBadge').textContent = '停止中';
+  document.getElementById('motionBadge').style.display = 'none';
+  updateBar(0);
+  showMsg('監視を停止しました', 'info');
+}
+
+function updateBar(pct) {
+  const threshold = parseInt(document.getElementById('sensitivity').value);
+  const bar = document.getElementById('motionBar');
+  bar.style.width = Math.min(pct, 100) + '%';
+  bar.style.background = pct >= threshold ? '#dc3232' : '#2a6';
+  document.getElementById('motionPct').textContent = pct.toFixed(1) + '%';
+}
+
+function detectLoop() {
+  if (!detecting) return;
+  if (video.readyState < 2) {
+    animFrame = requestAnimationFrame(detectLoop);
+    return;
+  }
+
+  const W = video.videoWidth  || 640;
+  const H = video.videoHeight || 480;
+  const sw = Math.floor(W / 4);
+  const sh = Math.floor(H / 4);
+
+  diffCanvas.width  = sw;
+  diffCanvas.height = sh;
+  diffCtx.drawImage(video, 0, 0, sw, sh);
+  const curr = diffCtx.getImageData(0, 0, sw, sh);
+
+  if (prevData) {
+    let diffCount = 0;
+    const total = sw * sh;
+    const d1 = prevData.data;
+    const d2 = curr.data;
+
+    for (let i = 0; i < d1.length; i += 4) {
+      const dr = Math.abs(d1[i]   - d2[i]);
+      const dg = Math.abs(d1[i+1] - d2[i+1]);
+      const db = Math.abs(d1[i+2] - d2[i+2]);
+      if ((dr + dg + db) / 3 > 25) diffCount++;
+    }
+
+    const motionPct = (diffCount / total) * 100;
+    updateBar(motionPct);
+
+    const threshold = parseInt(document.getElementById('sensitivity').value);
+    if (motionPct >= threshold) {
+      document.getElementById('motionBadge').style.display = 'block';
+      if (!cooldown) {
+        cooldown = true;
+        detectCount++;
+        document.getElementById('statDetect').textContent = detectCount;
+        capturePhoto();
+        setTimeout(() => { cooldown = false; }, 5000);
+      }
+    } else {
+      document.getElementById('motionBadge').style.display = 'none';
+    }
+  }
+
+  prevData = curr;
+
+  setTimeout(() => {
+    if (detecting) animFrame = requestAnimationFrame(detectLoop);
+  }, 100);
+}
+
+function capturePhoto() {
+  const canvas = document.createElement('canvas');
+  canvas.width  = video.videoWidth;
+  canvas.height = video.videoHeight;
+  canvas.getContext('2d').drawImage(video, 0, 0);
+
+  const flash = document.getElementById('flash');
+  flash.style.opacity = '0.9';
+  setTimeout(() => { flash.style.opacity = '0'; }, 120);
+
+  photoCount++;
+  document.getElementById('statPhoto').textContent = photoCount;
+  const now = new Date();
+  document.getElementById('statTime').textContent =
+    now.getHours().toString().padStart(2,'0') + ':' +
+    now.getMinutes().toString().padStart(2,'0');
+
+  const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+  addPhotoToLog(dataUrl, now);
+
+  // メール通知
+  sendEmailNotification(now);
+}
+
+function sendEmailNotification(time) {
+  const enabled = document.getElementById('emailEnabled').checked;
+  const toEmail = document.getElementById('toEmail').value.trim();
+
+  if (!enabled) return;
+  if (!toEmail) {
+    showMsg('送信先メールアドレスを入力してください', 'error');
+    return;
+  }
+
+  const timeStr =
+    time.getFullYear() + '/' +
+    (time.getMonth()+1).toString().padStart(2,'0') + '/' +
+    time.getDate().toString().padStart(2,'0') + ' ' +
+    time.getHours().toString().padStart(2,'0') + ':' +
+    time.getMinutes().toString().padStart(2,'0') + ':' +
+    time.getSeconds().toString().padStart(2,'0');
+
+  showMsg('メール送信中...', 'info');
+
+  emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
+    to_email:     toEmail,
+    time:         timeStr,
+    detect_count: detectCount,
+    name:         '俳諧感知器',
+    email:        toEmail,
+    message:      timeStr + ' に動きを検知しました。検知回数：' + detectCount + ' 回'
+  })
+  .then(() => {
+    showMsg('✓ メール送信完了（' + timeStr + '）', 'ok');
+  })
+  .catch((err) => {
+    showMsg('メール送信失敗: ' + JSON.stringify(err), 'error');
+  });
+}
+
+function addPhotoToLog(dataUrl, time) {
+  document.getElementById('photoLog').style.display = 'block';
+  const grid = document.getElementById('photoGrid');
+
+  const wrap = document.createElement('div');
+  wrap.className = 'photo-item';
+
+  const img = document.createElement('img');
+  img.src = dataUrl;
+
+  const ts = document.createElement('div');
+  ts.className = 'photo-time';
+  ts.textContent =
+    time.getHours().toString().padStart(2,'0') + ':' +
+    time.getMinutes().toString().padStart(2,'0') + ':' +
+    time.getSeconds().toString().padStart(2,'0');
+
+  const dl = document.createElement('a');
+  dl.className = 'photo-dl';
+  dl.href = dataUrl;
+  dl.download = 'haikai_' + Date.now() + '.jpg';
+  dl.textContent = '保存';
+
+  wrap.appendChild(img);
+  wrap.appendChild(ts);
+  wrap.appendChild(dl);
+  grid.insertBefore(wrap, grid.firstChild);
+  if (grid.children.length > 9) grid.removeChild(grid.lastChild);
+}
+</script>
+</body>
+</html>
